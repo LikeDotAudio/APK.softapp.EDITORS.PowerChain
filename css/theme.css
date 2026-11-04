@@ -1,21 +1,48 @@
-/* Deep Horizon Dark Environment Theme - Matching APK.audio OS */
+/* Part of the APK.audio project — http://APK.audio — made by Anthony Kuzub */
+/* MIT Licence. Free, for everyone, for ever. Full text in LICENSE at the root. */
+/* APK.audio Environment & OS Design Theme Tokens */
+
 :root {
-  --osc-bg-base: #080C16;
-  --osc-bg-surface: #121A2F;
-  --osc-bg-surface-hover: #1E2A45;
-  --osc-bg-input: #0E1424;
-  --osc-border-default: #1E2A45;
-  --osc-border-light: #2D3D60;
-  --osc-accent-primary: #F4902C;
-  --osc-accent-secondary: #4A9EFF;
-  --osc-text-primary: #F0F4F8;
-  --osc-text-muted: #8B9BB4;
-  --osc-text-subtle: #4D5E80;
-  --osc-status-danger: #EF4444;
-  --osc-status-success: #10B981;
-  --osc-status-warning: #F59E0B;
+  /* Site & OS Contract Tokens */
+  --apk-accent: #f4902c;
+  --apk-accent-hover: #ffa552;
+  --apk-on-accent: #111111;
+  --apk-state-good: #2ea043;
+  --apk-state-dead: #f85149;
+  --apk-state-kinda: #d29922;
+
+  /* Shell / OS Ground & Panel Tokens (Matching APK.audio OS theme.css) */
+  --bg-dark: #121212;
+  --bg-panel: #18181b;
+  --bg-surface: #18181b;
+  --bg-surface-hover: #222226;
+  --bg-window: #000000;
+  --bg-input: #0f0f11;
+  --border-color: #2c2c2c;
+  --border-light: #3f3f46;
+  --text-main: #f4f4f5;
+  --text-muted: #888888;
+  --text-subtle: #52525b;
+
+  /* Mapped Softapp & Buddy Variables */
+  --osc-bg-base: var(--bg-dark, #121212);
+  --osc-bg-surface: var(--bg-panel, #18181b);
+  --osc-bg-surface-hover: var(--bg-surface-hover, #222226);
+  --osc-bg-input: var(--bg-input, #0f0f11);
+  --osc-border-default: var(--border-color, #2c2c2c);
+  --osc-border-light: var(--border-light, #3f3f46);
+  --osc-border-muted: #242428;
+  --osc-accent-primary: var(--accent, var(--apk-accent, #f4902c));
+  --osc-accent-secondary: #38bdf8;
+  --osc-text-primary: var(--text-main, #f4f4f5);
+  --osc-text-muted: var(--text-muted, #888888);
+  --osc-text-subtle: var(--text-subtle, #52525b);
+  --osc-status-danger: var(--apk-state-dead, #ef4444);
+  --osc-status-success: var(--apk-state-good, #22c55e);
+  --osc-status-warning: var(--apk-state-kinda, #f59e0b);
+
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 * {
@@ -37,34 +64,34 @@ body {
 }
 
 .app-window-header {
-  height: 40px;
+  height: 36px;
   background: var(--osc-bg-surface);
   border-bottom: 1px solid var(--osc-border-default);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 14px;
+  padding: 0 12px;
   user-select: none;
 }
 
 .window-title-group {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .window-dot {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: var(--osc-accent-primary);
   box-shadow: 0 0 8px rgba(244, 144, 44, 0.4);
 }
 
 .window-title {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--osc-text-primary);
 }
 
@@ -72,8 +99,8 @@ body {
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
-  padding: 2px 7px;
-  border-radius: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
   background: var(--osc-bg-input);
   border: 1px solid var(--osc-border-default);
   color: var(--osc-accent-primary);
@@ -82,15 +109,15 @@ body {
 .window-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 5px 11px;
+  gap: 5px;
+  padding: 4px 10px;
   font-size: 11px;
   font-weight: 600;
   border-radius: 4px;
@@ -103,11 +130,13 @@ body {
 
 .btn-primary {
   background: var(--osc-accent-primary);
-  color: #000;
+  color: #111111;
+  font-weight: 700;
 }
 
 .btn-primary:hover {
-  background: #f7a249;
+  background: var(--apk-accent-hover, #ffa552);
+  color: #000000;
 }
 
 .btn-secondary {
@@ -117,30 +146,30 @@ body {
 }
 
 .btn-secondary:hover {
-  background: #283756;
+  background: #2c2c32;
   border-color: var(--osc-border-light);
 }
 
 .btn-sm {
-  padding: 3px 8px;
+  padding: 2px 7px;
   font-size: 10px;
 }
 
 .btn-icon {
-  padding: 5px 8px;
+  padding: 4px 7px;
   background: transparent;
   border: 1px solid transparent;
   color: var(--osc-text-muted);
 }
 
 .btn-icon:hover {
-  color: #fff;
+  color: #ffffff;
   background: var(--osc-bg-surface-hover);
 }
 
 .input {
   width: 100%;
-  padding: 6px 9px;
+  padding: 5px 8px;
   background: var(--osc-bg-input);
   border: 1px solid var(--osc-border-default);
   border-radius: 4px;

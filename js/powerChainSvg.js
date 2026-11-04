@@ -36,34 +36,34 @@ export function renderPowerDiagramSvg(model, options = {}) {
     const y = startY + idx * rowHeight;
     const amps = model.calculateCircuitAmps(ckt);
     const capPct = model.getCircuitCapacityPercent(ckt);
-    const pColor = phaseDisplayColors[ckt.phase] || '#8B9BB4';
+    const pColor = phaseDisplayColors[ckt.phase] || '#888888';
     const isOverload = capPct > 100;
     const isNearLimit = capPct > 80;
 
     return `
       <g class="circuit-row" data-circuit-id="${ckt.id}" style="cursor: pointer;">
         <rect x="20" y="${y}" width="${svgWidth - 40}" height="${rowHeight - 4}" rx="4"
-          fill="${isSelected ? '#1E2A45' : '#121A2F'}"
-          stroke="${isSelected ? '#F4902C' : isOverload ? '#EF4444' : '#1E2A45'}"
+          fill="${isSelected ? '#2c2c2c' : '#18181b'}"
+          stroke="${isSelected ? '#F4902C' : isOverload ? '#EF4444' : '#2c2c2c'}"
           stroke-width="${isSelected ? 2 : 1}"
         />
         <!-- Phase Indicator Pill -->
         <circle cx="40" cy="${y + 12}" r="6" fill="${pColor}"/>
-        <text x="56" y="${y + 16}" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="#F0F4F8">CKT ${String(ckt.number).padStart(2, '0')}</text>
-        <text x="120" y="${y + 16}" font-family="-apple-system, sans-serif" font-size="11" fill="#F0F4F8">${ckt.label}</text>
+        <text x="56" y="${y + 16}" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="#f4f4f5">CKT ${String(ckt.number).padStart(2, '0')}</text>
+        <text x="120" y="${y + 16}" font-family="-apple-system, sans-serif" font-size="11" fill="#f4f4f5">${ckt.label}</text>
         
         <!-- Redundancy badge -->
         ${ckt.redundantGroup ? `
-          <rect x="360" y="${y + 4}" width="${ckt.redundantGroup.length * 7 + 14}" height="16" rx="3" fill="#1E2A45" stroke="#F4902C" stroke-width="0.75"/>
+          <rect x="360" y="${y + 4}" width="${ckt.redundantGroup.length * 7 + 14}" height="16" rx="3" fill="#2c2c2c" stroke="#F4902C" stroke-width="0.75"/>
           <text x="367" y="${y + 15}" font-family="'JetBrains Mono', monospace" font-size="9" fill="#F4902C">GRP:${ckt.redundantGroup}</text>
         ` : ''}
 
-        <text x="480" y="${y + 16}" font-family="'JetBrains Mono', monospace" font-size="11" fill="#8B9BB4">${ckt.volts}V · ${ckt.breakerAmps}A</text>
-        <text x="580" y="${y + 16}" font-family="'JetBrains Mono', monospace" font-size="11" fill="#F0F4F8">${ckt.loadsVA} VA</text>
+        <text x="480" y="${y + 16}" font-family="'JetBrains Mono', monospace" font-size="11" fill="#888888">${ckt.volts}V · ${ckt.breakerAmps}A</text>
+        <text x="580" y="${y + 16}" font-family="'JetBrains Mono', monospace" font-size="11" fill="#f4f4f5">${ckt.loadsVA} VA</text>
         <text x="660" y="${y + 16}" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="600" fill="${isOverload ? '#EF4444' : isNearLimit ? '#F59E0B' : '#10B981'}">${amps} A (${capPct}%)</text>
         
         <!-- Progress mini bar -->
-        <rect x="750" y="${y + 8}" width="60" height="8" rx="2" fill="#080C16"/>
+        <rect x="750" y="${y + 8}" width="60" height="8" rx="2" fill="#121212"/>
         <rect x="750" y="${y + 8}" width="${Math.min(60, (capPct / 100) * 60)}" height="8" rx="2" fill="${isOverload ? '#EF4444' : isNearLimit ? '#F59E0B' : '#10B981'}"/>
       </g>
     `;
@@ -71,30 +71,30 @@ export function renderPowerDiagramSvg(model, options = {}) {
 
   return `
     <svg id="power-canvas-svg" width="${svgWidth}" height="${Math.max(svgHeight, startY + model.circuits.length * rowHeight + 40)}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="100%" height="100%" fill="#080C16"/>
+      <rect width="100%" height="100%" fill="#121212"/>
 
       <!-- Panel Summary Header Card -->
       <g transform="translate(20, 20)">
-        <rect width="${svgWidth - 40}" height="120" rx="6" fill="#121A2F" stroke="#1E2A45" stroke-width="1"/>
-        <text x="20" y="28" font-family="-apple-system, sans-serif" font-size="14" font-weight="700" fill="#F0F4F8">${model.panelName} — MAIN DISTRIBUTION</text>
-        <text x="20" y="46" font-family="'JetBrains Mono', monospace" font-size="11" fill="#8B9BB4">${model.mainsConfig} · ${model.mainBreakerAmps}A Main Breaker</text>
+        <rect width="${svgWidth - 40}" height="120" rx="6" fill="#18181b" stroke="#2c2c2c" stroke-width="1"/>
+        <text x="20" y="28" font-family="-apple-system, sans-serif" font-size="14" font-weight="700" fill="#f4f4f5">${model.panelName} — MAIN DISTRIBUTION</text>
+        <text x="20" y="46" font-family="'JetBrains Mono', monospace" font-size="11" fill="#888888">${model.mainsConfig} · ${model.mainBreakerAmps}A Main Breaker</text>
         <text x="20" y="66" font-family="'JetBrains Mono', monospace" font-size="11" fill="#F4902C">Total Load: ${(rollup.total_VA / 1000).toFixed(2)} kVA · Unbalance: ${rollup.unbalancePercent}%</text>
 
         <!-- Phase Balance Bars -->
         <g transform="translate(${svgWidth - 280}, 16)">
-          <text x="0" y="12" font-family="-apple-system, sans-serif" font-size="10" font-weight="600" fill="#8B9BB4">3-PHASE BALANCE</text>
+          <text x="0" y="12" font-family="-apple-system, sans-serif" font-size="10" font-weight="600" fill="#888888">3-PHASE BALANCE</text>
           
           <!-- Phase A -->
           <rect x="0" y="${20 + (barMaxH - hA)}" width="22" height="${hA}" rx="2" fill="${phaseDisplayColors.A}"/>
-          <text x="11" y="102" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#8B9BB4">A</text>
+          <text x="11" y="102" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#888888">A</text>
           
           <!-- Phase B -->
           <rect x="34" y="${20 + (barMaxH - hB)}" width="22" height="${hB}" rx="2" fill="${phaseDisplayColors.B}"/>
-          <text x="45" y="102" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#8B9BB4">B</text>
+          <text x="45" y="102" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#888888">B</text>
 
           <!-- Phase C -->
           <rect x="68" y="${20 + (barMaxH - hC)}" width="22" height="${hC}" rx="2" fill="${phaseDisplayColors.C}"/>
-          <text x="79" y="102" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#8B9BB4">C</text>
+          <text x="79" y="102" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#888888">C</text>
         </g>
       </g>
 

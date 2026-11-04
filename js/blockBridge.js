@@ -16,6 +16,7 @@ export class BlockBridge {
 
   init() {
     if (typeof window === 'undefined') return;
+    this.inheritParentTheme();
 
     window.addEventListener('message', (event) => {
       const msg = event.data;
@@ -97,4 +98,27 @@ export class BlockBridge {
     }
     return null;
   }
+
+  inheritParentTheme() {
+    try {
+      if (this.isEmbedded && window.parent && window.parent.document) {
+        const pDoc = window.parent.document.documentElement;
+        const pStyle = window.parent.getComputedStyle(pDoc);
+        const tokens = [
+          '--accent', '--bg-dark', '--bg-panel', '--bg-surface',
+          '--bg-window', '--border-color', '--border-light',
+          '--text-main', '--text-muted', '--text-subtle',
+          '--apk-accent', '--apk-accent-hover', '--apk-accent-tint',
+          '--apk-state-good', '--apk-state-dead', '--apk-state-kinda'
+        ];
+        for (const t of tokens) {
+          const val = pStyle.getPropertyValue(t);
+          if (val && val.trim()) {
+            document.documentElement.style.setProperty(t, val.trim());
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
 }
