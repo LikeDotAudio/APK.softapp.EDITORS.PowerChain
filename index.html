@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Power Chain Editor — APK.audio</title>
+  <link rel="stylesheet" href="css/theme.css">
+  <style>
+    .workspace {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      flex: 1;
+      overflow: hidden;
+    }
+    .panel-right {
+      background: var(--osc-bg-surface);
+      border-left: 1px solid var(--osc-border-default);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 10px 14px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--osc-text-muted);
+      border-bottom: 1px solid var(--osc-border-default);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-body {
+      padding: 14px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .canvas-viewport {
+      background: var(--osc-bg-base);
+      overflow: auto;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+    }
+    .toolbar-bar {
+      height: 36px;
+      background: var(--osc-bg-surface);
+      border-bottom: 1px solid var(--osc-border-default);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+    }
+  </style>
+</head>
+<body>
+  <header class="app-window-header">
+    <div class="window-title-group">
+      <div class="window-dot" style="background: #F59E0B; box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);"></div>
+      <span class="window-title">Power Chain Editor</span>
+      <span class="window-pill" id="block-tag" style="color: #F59E0B;">ELECTRICAL / POWER</span>
+    </div>
+    <div class="window-actions">
+      <button class="btn btn-secondary btn-sm" id="btn-open-block">📂 Open Block</button>
+      <button class="btn btn-secondary btn-sm" id="btn-discovered">⚡ Discovered</button>
+      <button class="btn btn-primary btn-sm" id="btn-save-block">💾 Save & Return</button>
+      <button class="btn btn-icon btn-sm" id="btn-close" title="Close Window">✕</button>
+    </div>
+  </header>
+
+  <div class="toolbar-bar">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button class="btn btn-secondary btn-sm" id="btn-add-circuit">➕ Add Breaker Circuit</button>
+      <span style="font-size: 11px; color: var(--osc-text-muted);">120/208V 3-Phase technical power branch circuits</span>
+    </div>
+    <div id="telemetry-metrics"></div>
+  </div>
+
+  <div class="workspace">
+    <!-- Center Interactive SVG Canvas -->
+    <main class="canvas-viewport" id="canvas-wrapper">
+      <!-- Power SVG rendered dynamically -->
+    </main>
+
+    <!-- Right Inspector & Redundancy Audit -->
+    <aside class="panel-right">
+      <div class="panel-header">
+        <span>CIRCUIT INSPECTOR</span>
+      </div>
+      <div class="panel-body" id="inspector-content">
+        <!-- Circuit properties rendered here -->
+      </div>
+      <div style="padding: 12px; border-top: 1px solid var(--osc-border-default);" id="redundancy-clashes">
+        <!-- Redundancy audit rendered here -->
+      </div>
+    </aside>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

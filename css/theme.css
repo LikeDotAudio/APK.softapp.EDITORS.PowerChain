@@ -1,0 +1,155 @@
+/* Deep Horizon Dark Environment Theme - Matching APK.audio OS */
+:root {
+  --osc-bg-base: #080C16;
+  --osc-bg-surface: #121A2F;
+  --osc-bg-surface-hover: #1E2A45;
+  --osc-bg-input: #0E1424;
+  --osc-border-default: #1E2A45;
+  --osc-border-light: #2D3D60;
+  --osc-accent-primary: #F4902C;
+  --osc-accent-secondary: #4A9EFF;
+  --osc-text-primary: #F0F4F8;
+  --osc-text-muted: #8B9BB4;
+  --osc-text-subtle: #4D5E80;
+  --osc-status-danger: #EF4444;
+  --osc-status-success: #10B981;
+  --osc-status-warning: #F59E0B;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--osc-bg-base);
+  color: var(--osc-text-primary);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-window-header {
+  height: 40px;
+  background: var(--osc-bg-surface);
+  border-bottom: 1px solid var(--osc-border-default);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  user-select: none;
+}
+
+.window-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.window-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--osc-accent-primary);
+  box-shadow: 0 0 8px rgba(244, 144, 44, 0.4);
+}
+
+.window-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--osc-text-primary);
+}
+
+.window-pill {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--osc-bg-input);
+  border: 1px solid var(--osc-border-default);
+  color: var(--osc-accent-primary);
+}
+
+.window-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 11px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  color: var(--osc-text-primary);
+}
+
+.btn-primary {
+  background: var(--osc-accent-primary);
+  color: #000;
+}
+
+.btn-primary:hover {
+  background: #f7a249;
+}
+
+.btn-secondary {
+  background: var(--osc-bg-surface-hover);
+  border-color: var(--osc-border-default);
+  color: var(--osc-text-primary);
+}
+
+.btn-secondary:hover {
+  background: #283756;
+  border-color: var(--osc-border-light);
+}
+
+.btn-sm {
+  padding: 3px 8px;
+  font-size: 10px;
+}
+
+.btn-icon {
+  padding: 5px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--osc-text-muted);
+}
+
+.btn-icon:hover {
+  color: #fff;
+  background: var(--osc-bg-surface-hover);
+}
+
+.input {
+  width: 100%;
+  padding: 6px 9px;
+  background: var(--osc-bg-input);
+  border: 1px solid var(--osc-border-default);
+  border-radius: 4px;
+  color: var(--osc-text-primary);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--osc-accent-primary);
+}

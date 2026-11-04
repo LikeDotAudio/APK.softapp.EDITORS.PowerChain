@@ -1,0 +1,8 @@
+{
+  "name": "Power Chain Editor",
+  "icon": "⚡",
+  "group": "Design",
+  "description": "Technical power distribution editor with 3-phase balancing, breaker sizing, and UPS redundancy checks",
+  "entrypoint": "index.html",
+  "blockTypes": ["powerchain", "power", "electrical"]
+}
