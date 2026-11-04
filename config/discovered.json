@@ -1,0 +1,4 @@
+{
+  "_note": "Kinds of discovered thing this editor lists (case-insensitive substring of a protocol, scanner kind or device_class). Empty = everything the bus knows.",
+  "kinds": []
+}

@@ -1,6 +1,11 @@
 // Part of the APK.audio project — http://APK.audio — made by Anthony Kuzub
 // MIT Licence. Free, for everyone, for ever. Full text in LICENSE at the root.
 
+
+/* Every text from the model is escaped before it goes into the SVG markup. */
+export function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
 export function renderPowerDiagramSvg(model, options = {}) {
   const { selectedCircuitId = null } = options;
   const rollup = model.getPhaseRollup();
@@ -41,7 +46,7 @@ export function renderPowerDiagramSvg(model, options = {}) {
     const isNearLimit = capPct > 80;
 
     return `
-      <g class="circuit-row" data-circuit-id="${ckt.id}" style="cursor: pointer;">
+      <g class="circuit-row" data-circuit-id="${esc(ckt.id)}" style="cursor: pointer;">
         <rect x="20" y="${y}" width="${svgWidth - 40}" height="${rowHeight - 4}" rx="4"
           fill="${isSelected ? '#2c2c2c' : '#18181b'}"
           stroke="${isSelected ? '#F4902C' : isOverload ? '#EF4444' : '#2c2c2c'}"
@@ -50,16 +55,16 @@ export function renderPowerDiagramSvg(model, options = {}) {
         <!-- Phase Indicator Pill -->
         <circle cx="40" cy="${y + 12}" r="6" fill="${pColor}"/>
         <text x="56" y="${y + 16}" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="#f4f4f5">CKT ${String(ckt.number).padStart(2, '0')}</text>
-        <text x="120" y="${y + 16}" font-family="-apple-system, sans-serif" font-size="11" fill="#f4f4f5">${ckt.label}</text>
+        <text x="120" y="${y + 16}" font-family="-apple-system, sans-serif" font-size="11" fill="#f4f4f5">${esc(ckt.label)}</text>
         
         <!-- Redundancy badge -->
         ${ckt.redundantGroup ? `
           <rect x="360" y="${y + 4}" width="${ckt.redundantGroup.length * 7 + 14}" height="16" rx="3" fill="#2c2c2c" stroke="#F4902C" stroke-width="0.75"/>
-          <text x="367" y="${y + 15}" font-family="'JetBrains Mono', monospace" font-size="9" fill="#F4902C">GRP:${ckt.redundantGroup}</text>
+          <text x="367" y="${y + 15}" font-family="'JetBrains Mono', monospace" font-size="9" fill="#F4902C">GRP:${esc(ckt.redundantGroup)}</text>
         ` : ''}
 
-        <text x="480" y="${y + 16}" font-family="'JetBrains Mono', monospace" font-size="11" fill="#888888">${ckt.volts}V · ${ckt.breakerAmps}A</text>
-        <text x="580" y="${y + 16}" font-family="'JetBrains Mono', monospace" font-size="11" fill="#f4f4f5">${ckt.loadsVA} VA</text>
+        <text x="480" y="${y + 16}" font-family="'JetBrains Mono', monospace" font-size="11" fill="#888888">${esc(ckt.volts)}V · ${esc(ckt.breakerAmps)}A</text>
+        <text x="580" y="${y + 16}" font-family="'JetBrains Mono', monospace" font-size="11" fill="#f4f4f5">${esc(ckt.loadsVA)} VA</text>
         <text x="660" y="${y + 16}" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="600" fill="${isOverload ? '#EF4444' : isNearLimit ? '#F59E0B' : '#10B981'}">${amps} A (${capPct}%)</text>
         
         <!-- Progress mini bar -->
@@ -76,9 +81,9 @@ export function renderPowerDiagramSvg(model, options = {}) {
       <!-- Panel Summary Header Card -->
       <g transform="translate(20, 20)">
         <rect width="${svgWidth - 40}" height="120" rx="6" fill="#18181b" stroke="#2c2c2c" stroke-width="1"/>
-        <text x="20" y="28" font-family="-apple-system, sans-serif" font-size="14" font-weight="700" fill="#f4f4f5">${model.panelName} — MAIN DISTRIBUTION</text>
-        <text x="20" y="46" font-family="'JetBrains Mono', monospace" font-size="11" fill="#888888">${model.mainsConfig} · ${model.mainBreakerAmps}A Main Breaker</text>
-        <text x="20" y="66" font-family="'JetBrains Mono', monospace" font-size="11" fill="#F4902C">Total Load: ${(rollup.total_VA / 1000).toFixed(2)} kVA · Unbalance: ${rollup.unbalancePercent}%</text>
+        <text x="20" y="28" font-family="-apple-system, sans-serif" font-size="14" font-weight="700" fill="#f4f4f5">${esc(model.panelName)} — MAIN DISTRIBUTION</text>
+        <text x="20" y="46" font-family="'JetBrains Mono', monospace" font-size="11" fill="#888888">${esc(model.mainsConfig)} · ${esc(model.mainBreakerAmps)}A Main Breaker</text>
+        <text x="20" y="66" font-family="'JetBrains Mono', monospace" font-size="11" fill="#F4902C">Total Load: ${(rollup.total_VA / 1000).toFixed(2)} kVA · Unbalance: ${esc(rollup.unbalancePercent)}%</text>
 
         <!-- Phase Balance Bars -->
         <g transform="translate(${svgWidth - 280}, 16)">

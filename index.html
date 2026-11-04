@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Power Chain Editor — APK.audio</title>
   <link rel="stylesheet" href="./vendor/apk-contracts/apk-tokens.css">
+  <link rel="stylesheet" href="./vendor/apk-table/apk-table.css">
   <link rel="stylesheet" href="css/theme.css">
   <style>
     .workspace {
@@ -70,6 +71,12 @@
     </div>
   </header>
 
+  <!-- What the bus knows (APKSoftapp.discovered): identity is MAC / serial, state good / kinda / dead. -->
+  <section id="discovered-panel" hidden style="max-height: 40vh; overflow: auto; padding: 8px 14px; border-bottom: 1px solid var(--osc-border-default); background: var(--osc-bg-surface);">
+    <div id="discovered-status" role="status" style="font-size: 11px; color: var(--osc-text-muted); margin-bottom: 6px;"></div>
+    <div id="discovered-table"></div>
+  </section>
+
   <div class="toolbar-bar">
     <div style="display: flex; align-items: center; gap: 8px;">
       <button class="btn btn-secondary btn-sm" id="btn-add-circuit">➕ Add Breaker Circuit</button>
@@ -98,6 +105,10 @@
     </aside>
   </div>
 
+  <script src="./vendor/apk-contracts/apk-contracts.global.js"></script>
+  <script src="/FrontEnd/shared/apk-bus.js"></script>
+  <script src="./vendor/apk-softapp/apk-softapp.js"></script>
+  <script src="./vendor/apk-table/apk-table.js"></script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

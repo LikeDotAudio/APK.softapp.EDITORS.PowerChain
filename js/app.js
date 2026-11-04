@@ -1,22 +1,27 @@
 // Part of the APK.audio project — http://APK.audio — made by Anthony Kuzub
 // MIT Licence. Free, for everyone, for ever. Full text in LICENSE at the root.
 
-import { BlockBridge } from './blockBridge.js';
+import { linkBlock, mountDiscovered } from './softappLink.js';
 import { PowerChainModel } from './powerChainModel.js';
 import { renderPowerDiagramSvg } from './powerChainSvg.js';
 
 let model = new PowerChainModel();
 
-const bridge = new BlockBridge({
-  name: 'Power Chain Editor',
-  type: 'powerchain',
-  defaultBlock: model.toJSON(),
-  onBlockLoaded: (block) => {
-    if (block) {
-      model = new PowerChainModel(block);
-      renderAll();
-    }
+const S = window.APKSoftapp;
+const esc = S.esc;
+
+const bridge = linkBlock(S, {
+  editor: 'Power Chain Editor',
+  blockType: 'powerchain',
+  Model: PowerChainModel,
+  getModel: () => model,
+  setModel: (m, meta) => {
+    model = m;
+    const tag = document.getElementById('block-tag');
+    if (tag && (meta.blockName || meta.filename)) tag.textContent = meta.blockName || meta.filename;
+    renderAll();
   },
+  filename: (m) => m.panelName.toLowerCase().replace(/\s+/g, '_'),
 });
 
 function renderInspector() {
@@ -36,14 +41,14 @@ function renderInspector() {
 
     container.innerHTML = `
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid var(--osc-border-default); padding-bottom: 8px;">
-        <span style="font-weight: 700; color: var(--osc-text-primary); font-size: 13px;">CKT ${ckt.number} — ${ckt.label}</span>
+        <span style="font-weight: 700; color: var(--osc-text-primary); font-size: 13px;">CKT ${esc(ckt.number)} — ${esc(ckt.label)}</span>
         <button class="btn btn-secondary btn-sm" id="btn-delete-ckt" style="color: var(--osc-status-danger);">🗑️ Delete</button>
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 10px;">
         <div>
           <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">CIRCUIT LABEL</label>
-          <input type="text" class="input" id="inp-label" value="${ckt.label}">
+          <input type="text" class="input" id="inp-label" value="${esc(ckt.label)}">
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
           <div>
@@ -67,16 +72,16 @@ function renderInspector() {
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
           <div>
             <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">VOLTAGE (V)</label>
-            <input type="number" class="input" id="inp-volts" value="${ckt.volts}">
+            <input type="number" class="input" id="inp-volts" value="${esc(ckt.volts)}">
           </div>
           <div>
             <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">CONNECTED LOAD (VA)</label>
-            <input type="number" class="input" id="inp-load-va" value="${ckt.loadsVA}">
+            <input type="number" class="input" id="inp-load-va" value="${esc(ckt.loadsVA)}">
           </div>
         </div>
         <div>
           <label style="display: block; font-size: 10px; color: var(--osc-text-muted); margin-bottom: 3px;">REDUNDANT GROUP PAIRING</label>
-          <input type="text" class="input" id="inp-redundant" value="${ckt.redundantGroup || ''}" placeholder="e.g. CONSOLE, CORE_DSP, VISION">
+          <input type="text" class="input" id="inp-redundant" value="${esc(ckt.redundantGroup || '')}" placeholder="e.g. CONSOLE, CORE_DSP, VISION">
           <small style="font-size: 9px; color: var(--osc-text-subtle);">Redundant feeds should be on different phases</small>
         </div>
         
@@ -96,7 +101,7 @@ function renderInspector() {
 
     document.getElementById('btn-delete-ckt')?.addEventListener('click', () => {
       model.deleteCircuit(ckt.id);
-      bridge.notifyChanged();
+      bridge.changed();
       renderAll();
     });
 
@@ -104,7 +109,7 @@ function renderInspector() {
       document.getElementById(id)?.addEventListener('input', (e) => {
         const val = isNum ? parseFloat(e.target.value) || 0 : e.target.value;
         model.updateCircuit(ckt.id, { [prop]: val });
-        bridge.notifyChanged();
+        bridge.changed();
         renderSvg();
         renderHeaderStats();
         renderClashes();
@@ -136,8 +141,8 @@ function renderHeaderStats() {
   container.innerHTML = `
     <div style="display: flex; align-items: center; gap: 14px; font-size: 10px; color: var(--osc-text-muted);">
       <span>TOTAL LOAD: <strong style="color: var(--osc-accent-primary);">${(rollup.total_VA / 1000).toFixed(2)} kVA</strong></span>
-      <span>PHASE UNBALANCE: <strong style="color: ${rollup.unbalancePercent > 20 ? 'var(--osc-status-warning)' : 'var(--osc-status-success)'};">${rollup.unbalancePercent}%</strong></span>
-      <span>CIRCUITS: <strong style="color: var(--osc-text-primary);">${model.circuits.length}</strong></span>
+      <span>PHASE UNBALANCE: <strong style="color: ${rollup.unbalancePercent > 20 ? 'var(--osc-status-warning)' : 'var(--osc-status-success)'};">${esc(rollup.unbalancePercent)}%</strong></span>
+      <span>CIRCUITS: <strong style="color: var(--osc-text-primary);">${esc(model.circuits.length)}</strong></span>
     </div>
   `;
 }
@@ -156,7 +161,7 @@ function renderClashes() {
   } else {
     container.innerHTML = clashes.map((c) => `
       <div style="padding: 8px; background: rgba(239, 68, 68, 0.1); border: 1px solid var(--osc-status-danger); border-radius: 4px; font-size: 10px; color: var(--osc-status-danger); margin-bottom: 6px;">
-        ⚠️ <strong>${c.group}:</strong> ${c.reason}
+        ⚠️ <strong>${esc(c.group)}:</strong> ${esc(c.reason)}
       </div>
     `).join('');
   }
@@ -201,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-add-circuit')?.addEventListener('click', () => {
     const newCkt = model.addCircuit({});
     model.selectedCircuitId = newCkt.id;
-    bridge.notifyChanged();
+    bridge.changed();
     renderAll();
   });
 
@@ -216,9 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
       reader.onload = (event) => {
         try {
           const parsed = JSON.parse(event.target.result);
-          model = new PowerChainModel(parsed);
-          bridge.loadBlock(model.toJSON(), { filename: file.name });
-          renderAll();
+          bridge.openLocal(parsed, { filename: file.name });
         } catch (err) {
           alert('Failed to parse power file: ' + err.message);
         }
@@ -228,17 +231,16 @@ document.addEventListener('DOMContentLoaded', () => {
     input.click();
   });
 
-  document.getElementById('btn-discovered')?.addEventListener('click', async () => {
-    const project = await bridge.fetchDiscoveredProject();
-    if (project) {
-      alert(`Discovered Project: ${project.project_name || 'Technical Power System'}\nCircuits: ${model.circuits.length}`);
-    } else {
-      alert('Connecting to live discovery bus...');
-    }
+  mountDiscovered(S, window.APKTable, {
+    button: document.getElementById('btn-discovered'),
+    panel: document.getElementById('discovered-panel'),
+    status: document.getElementById('discovered-status'),
+    tableHost: document.getElementById('discovered-table'),
+    tableId: 'powerchain-discovered',
   });
 
   document.getElementById('btn-save-block')?.addEventListener('click', () => {
-    bridge.saveBlock(model.toJSON(), { filename: model.panelName.toLowerCase().replace(/\s+/g, '_') });
+    bridge.save();
   });
 
   document.getElementById('btn-close')?.addEventListener('click', () => {
