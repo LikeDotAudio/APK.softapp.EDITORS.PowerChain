@@ -70,8 +70,14 @@ export const DISCOVERED_COLUMNS = [
   { key: 'why', label: 'Why', editable: false },
 ];
 
-/** The kinds to show: a tunable in config/discovered.json, never a list in source. */
-export async function loadDiscoveredConfig(url = './config/discovered.json') {
+/** The kinds to show: a tunable in config/discovered.json, never a list in source.
+    Unreadable, it falls back to every kind and says why in `problem`. */
+export async function loadDiscoveredConfig(url = './config/discovered.json', S = globalThis.window && globalThis.window.APKSoftapp) {
+  if (S && S.fetchJson) {
+    const r = await S.fetchJson(url, { cache: 'no-store', timeoutMs: 8000, subject: 'config/discovered.json' });
+    if (!r.ok) return { kinds: [], problem: r.problem };
+    return { kinds: Array.isArray(r.data && r.data.kinds) ? r.data.kinds.map(String) : [] };
+  }
   try {
     const r = await fetch(url, { cache: 'no-store' });
     if (!r.ok) return { kinds: [] };
@@ -109,14 +115,29 @@ export function mountDiscovered(S, T, { button, panel, status, tableHost, tableI
     if (T && tableHost && !table) {
       table = T.create(tableHost, { id: tableId, columns, rows: [], empty: 'Nothing discovered yet.' });
     }
+    await connect();
+  });
+  /* Ask the bus. No SDK / bus / broker: the status line says it and a card
+     says what to do, with Retry; the editor keeps working on files. */
+  async function connect() {
     if (status) status.textContent = 'Asking the bus…';
-    const config = await loadDiscoveredConfig();
+    const config = await loadDiscoveredConfig(undefined, S);
+    if (config.problem && S.showProblem) {
+      S.showProblem(config.problem, { fix: ['Showing every kind the bus knows until config/discovered.json reads.'] });
+    }
     handle = await S.discovered({ kinds: config.kinds, onChange: show });
     if (!handle.ok) {
       if (status) status.textContent = handle.reason;
+      if (handle.problem && S.showProblem) {
+        S.showProblem(handle.problem, {
+          subject: 'Discovered',
+          fix: ['The editor still opens and saves blocks without the bus; only the Discovered table needs it.'],
+          onRetry: () => { if (!handle) connect(); },
+        });
+      }
       handle = null;
       return;
     }
     show(handle.things());
-  });
+  }
 }

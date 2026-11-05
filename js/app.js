@@ -201,6 +201,27 @@ function renderAll() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  S.describe({
+    name: 'Power Chain Editor',
+    does: 'Lays out a power panel: breaker circuits per phase, their load against rating, and a redundancy audit of dual-feed groups.',
+    inputs: [
+      { name: 'Power chain block', from: 'the CAD block this editor was opened on (host@1 load)', kind: 'cad' },
+      { name: 'Block file', from: '.json picked with Open Block', kind: 'file' },
+      { name: 'Discovered things', from: 'APKSoftapp.discovered() on the bus, filtered by config/discovered.json kinds', kind: 'bus' },
+    ],
+    outputs: [
+      { name: 'Power chain block', to: 'the CAD drawing on Save & Return, or a .json download standalone', kind: 'cad' },
+      { name: 'Live edits', to: 'the CAD after every change (blockChanged)', kind: 'cad' },
+      { name: 'Redundancy audit', to: 'on screen: groups whose feeds share a phase', kind: 'screen' },
+    ],
+    controls: [
+      { name: '➕ Add Breaker Circuit', how: 'adds a circuit and selects it' },
+      { name: 'Click a circuit', how: 'inspect it: label, phase, breaker rating, voltage, load VA, redundant group; 🗑️ deletes it' },
+      { name: '⚡ Discovered', how: 'show / hide what the bus knows' },
+      { name: 'Save & Return / ✕', how: 'save into the CAD (or download) / close the editor' },
+    ],
+    problems: ['bad_json', 'bad_input', 'file_unreadable', 'bus_missing', 'not_in_cad'],
+  });
   renderAll();
 
   document.getElementById('btn-add-circuit')?.addEventListener('click', () => {
@@ -223,9 +244,13 @@ document.addEventListener('DOMContentLoaded', () => {
           const parsed = JSON.parse(event.target.result);
           bridge.openLocal(parsed, { filename: file.name });
         } catch (err) {
-          alert('Failed to parse power file: ' + err.message);
+          S.showProblem(err.name === 'SyntaxError' ? 'bad_json' : 'bad_input', {
+            subject: file.name, detail: err.message,
+            fix: ['Open a power chain block saved by this editor (.json, blockType powerchain).'],
+          });
         }
       };
+      reader.onerror = () => S.showProblem('file_unreadable', { subject: file.name, detail: reader.error && reader.error.message });
       reader.readAsText(file);
     };
     input.click();
