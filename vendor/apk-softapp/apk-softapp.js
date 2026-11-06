@@ -410,9 +410,49 @@
             return a;
         }
 
+        // System/BareMetal/{target}/{node}/timeline — contracts BareMetalTimeline (baremetal-timeline.ts),
+        // told by its shape: the last minute as baseline + timed deltas, every 30 s. Folded into the rows
+        // (each reads what it read at `to`, last_seen = `to`), never mistaken for a status. The retained
+        // tables are restated only on change, so this post is what keeps a quiet agent fresh.
+        function isTimeline(doc) {
+            return isObj(doc) && Array.isArray(doc.deltas) && isObj(doc.baseline) && typeof doc.to === 'string';
+        }
+
+        function timeline(seg, doc) {
+            var node = doc.node || seg[1];
+            if (!node) return false;
+            var a = agent(node, seg[0]);
+            var to = Date.parse(doc.to);
+            if (a.timeline && Date.parse(a.timeline.to) > to) return false;
+            a.timeline = doc;
+            var now = {};
+            Object.keys(doc.baseline).forEach(function (table) {
+                var keys = doc.baseline[table];
+                if (!isObj(keys)) return;
+                Object.keys(keys).forEach(function (key) {
+                    if (isObj(keys[key])) now[table + '|' + key] = { value: keys[key].value === undefined ? null : keys[key].value, unit: keys[key].unit, t: doc.from };
+                });
+            });
+            doc.deltas.forEach(function (d) {
+                if (!isObj(d) || !d.table || !d.key) return;
+                var k = d.table + '|' + d.key, had = now[k];
+                now[k] = { value: d.value === undefined ? null : d.value, unit: d.unit || (had && had.unit), t: d.t };
+            });
+            Object.keys(now).forEach(function (k) {
+                var r = now[k], held = a.rows[k];
+                if (held && Date.parse(held.last_seen) > to) return;
+                if (r.value === null && r.t !== doc.from) { delete a.rows[k]; return; }
+                var row = { node: node, key: k.slice(k.indexOf('|') + 1), value: r.value, last_seen: doc.to, since: r.t };
+                if (r.unit) row.unit = r.unit;
+                a.rows[k] = row;
+            });
+            return true;
+        }
+
         function bareMetal(seg, text) {
             var target = seg[0];
             var doc = parseJson(text);
+            if (isTimeline(doc)) return timeline(seg, doc);
             if (Array.isArray(doc)) {
                 var changed = false;
                 doc.forEach(function (row) {
