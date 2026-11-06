@@ -180,6 +180,7 @@ test('IfcOpenShell: 0 schema + EXPRESS errors, sets match the templates / apk_ps
   const files = {
     'power.ifc': exportFixture(),
     'planned.ifc': powerToIfc(new PowerChainModel({ id: 'power_plan' })),
+    'declared.ifc': powerToIfc(fixtureModel({ interruptingKA: 25 }), { types: partTypes() }),
   };
   for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
   const script = new URL('../scripts/validate-ifc.py', import.meta.url).pathname;
@@ -192,10 +193,15 @@ test('IfcOpenShell: 0 schema + EXPRESS errors, sets match the templates / apk_ps
     assert.deepEqual(r.checks, [], r.file);
     if (!r.oracle) continue;
     assert.deepEqual(r.pset_problems, [], r.file);
-    const own = r.ids_failures.filter((x) => !x.part && /boards|breakers/.test(x.spec));
+    const own = r.ids_failures.filter((x) => !x.part && /boards|breakers/.test(x.spec) && !x.undeclared);
     assert.deepEqual(own, [], `${r.file}: this editor's board and breakers pass apk-av.ids`);
+    // no default breaking capacity (ROAD-3598 answer 11): unknown until declared, and the IDS breaker
+    // spec flags every breaker that states none — that failure is intended, and it goes once declared
     const breakerSpec = r.ids.find((x) => x[0] === 'Circuit breakers carry breaking capacity');
-    assert.equal(breakerSpec[1], true, r.file);
+    const declared = r.file.endsWith('declared.ifc');
+    assert.equal(breakerSpec[1], declared, r.file);
+    if (declared) assert.deepEqual(r.undeclared_breaking, [], r.file);
+    else assert.ok(r.undeclared_breaking.length > 0, `${r.file}: the undeclared breakers are named`);
   }
   const planned = rows.find((r) => r.file.endsWith('planned.ifc'));
   if (planned.oracle) assert.equal(planned.ids.find((x) => x[0] === 'Distribution boards carry their rating')[1], true, 'no part types: the board spec passes outright');

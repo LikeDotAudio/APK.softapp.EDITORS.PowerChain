@@ -1,7 +1,7 @@
 // Part of the APK.audio project — http://APK.audio — made by Anthony Kuzub
 // MIT Licence. Free, for everyone, for ever. Full text in LICENSE at the root.
 /* The power chain (IFC-CORE-DELTAS power-2/3): one board (panelName, mainsConfig,
-   main breaker, interruptingKA — the breakers' breaking capacity, kA), its branch
+   main breaker, interruptingKA — the breakers' breaking capacity, kA, null until declared), its branch
    circuits, and the LOADS they feed. A load is an occurrence of a BIM part
    ({id, part, name, circuit | fedBy, rack, watts, heatW, weightKg, powerFactor,
    parts}): `circuit` when it is wired to a breaker, `fedBy` (a load id) when it is
@@ -52,8 +52,9 @@ export class PowerChainModel {
     this.panelName = initialData?.panelName || 'PANEL-EP1';
     this.mainsConfig = initialData?.mainsConfig || '120/208V 3-Phase 4-Wire';
     this.mainBreakerAmps = initialData?.mainBreakerAmps || 200;
-    // the breakers' breaking capacity (UL 489 interrupting rating / IEC 60947-2 Icu), kA
-    this.interruptingKA = n(initialData?.interruptingKA) ?? 10;
+    // the breakers' breaking capacity (UL 489 interrupting rating / IEC 60947-2 Icu), kA. NO default
+    // (ROAD-3598 answer 11): unknown until declared, and apk-av.ids flags a breaker that states none
+    this.interruptingKA = n(initialData?.interruptingKA);
     this.boardWeightKg = n(initialData?.boardWeightKg);
     this.loads = (initialData?.loads || []).map(normalizeLoad);
     /** partId → partFacts (powerRollup.js) of the BIM part's IFC type; read, never saved */

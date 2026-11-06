@@ -17,7 +17,8 @@
  *              (NumberOfCircuits, GrossWeight when declared); a MAINS SINK port
  *   breakers   IfcProtectiveDevice CIRCUITBREAKER, the main and one per circuit, aggregated in the board
  *              (IfcRelAggregates); typed per rating by IfcProtectiveDeviceType CIRCUITBREAKER with
- *              Pset_ProtectiveDeviceTypeCircuitBreaker.ICU60947 (A) + Pset_ElectricalDeviceCommon
+ *              Pset_ProtectiveDeviceTypeCircuitBreaker.ICU60947 (A, only when interruptingKA is declared:
+ *              never a default, so an undeclared one fails apk-av.ids' breaker spec) + Pset_ElectricalDeviceCommon
  *              (RatedCurrent, NumberOfPoles); on the occurrence ConductorFunction PHASE_L1..L3 and
  *              Pset_ProtectiveDeviceOccurrence.PoleUsage; one SOURCE port per load it feeds (an IfcPort
  *              joins ONE IfcRelConnectsPorts per role), Voltage = the circuit's volts

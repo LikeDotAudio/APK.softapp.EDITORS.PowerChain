@@ -11,6 +11,8 @@ prints one JSON object per file:
   pset_problems  every Pset_/Qto_ against the IFC4X3 templates and every APK_ set against apk_psets.py,
                  by the BIM repo's oracle (tools/ifc/oracle.py) when it is beside this app
   ids            apk-av.ids through ifctester: [name, passed, applicable, first reasons] per specification
+  undeclared_breaking  the breakers (and breaker types) that state no ICU60947: no default capacity, so the
+                 IDS breaker spec flags them until the designer declares one — reported, not an exit failure
   circuits       per IfcDistributionCircuit: Name, the classes ifcopenshell.util.system.get_system_elements
                  returns, and its APK_PowerRollup
   racks          per rack assembly: kit_report.walk's weight (declared total wins, else the sum of direct
@@ -31,7 +33,8 @@ import ifcopenshell.validate
 
 HERE = Path(__file__).resolve().parent
 TOOLS = HERE.parents[4] / "POD.database/DATABASE.server.BIM/SRC/tools/ifc"
-OWN_SPECS = ("Distribution boards carry their rating", "Circuit breakers carry breaking capacity")
+BREAKING = "Circuit breakers carry breaking capacity"
+OWN_SPECS = ("Distribution boards carry their rating", BREAKING)
 
 
 def _tools():
@@ -102,7 +105,9 @@ def ids_fail_elements(f):
                     continue
                 t = el if el.is_a("IfcTypeObject") else UE.get_type(el)
                 part = UE.get_psets(t).get("APK_Part", {}).get("PartId") if t is not None else None
-                out.append({"spec": sp.name, "class": el.is_a(), "name": getattr(el, "Name", None), "part": part})
+                icu = "ICU60947" in UE.get_psets(t if t is not None else el).get("Pset_ProtectiveDeviceTypeCircuitBreaker", {})
+                out.append({"spec": sp.name, "class": el.is_a(), "name": getattr(el, "Name", None), "part": part,
+                            "undeclared": sp.name == BREAKING and not icu})
     return out
 
 
@@ -123,10 +128,14 @@ def main(paths):
                              "rollup": UE.get_psets(c).get("APK_PowerRollup", {})})
         # the board / breaker specs: this editor's own board and breakers must pass; an embedded BIM part type
         # (a PDU) that states no rating is the library's data gap (test_ifc_oracle DATA_GAPS), reported, not ours
-        own_fail = [x for x in ids_failures if x["spec"] in OWN_SPECS and not x["part"]]
+        # a breaker that states NO breaking capacity is unknown until declared (ROAD-3598 answer 11): the IDS
+        # breaker spec flags it, as intended, and it is reported (undeclared_breaking), not this file's error;
+        # a capacity that IS stated and still fails the spec is
+        own_fail = [x for x in ids_failures if x["spec"] in OWN_SPECS and not x["part"] and not x["undeclared"]]
+        undeclared = sorted({x["name"] for x in ids_failures if x["undeclared"] and not x["part"]})
         print(json.dumps({"file": path, "schema": f.schema_identifier, "statements": len(st), "first": st[:5],
                           "pset_problems": pp, "ids": ids_rows, "ids_failures": ids_failures, "circuits": circuits, "racks": racks,
-                          "checks": ck, "oracle": bool(oracle)}))
+                          "checks": ck, "undeclared_breaking": undeclared, "oracle": bool(oracle)}))
         if st or pp or ck or own_fail:
             worst = 1
     return worst
