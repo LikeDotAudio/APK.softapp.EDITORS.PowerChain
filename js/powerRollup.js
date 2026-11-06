@@ -1,8 +1,10 @@
 // Part of the APK.audio project — http://APK.audio — made by Anthony Kuzub
 // MIT Licence. Free, for everyone, for ever. Full text in LICENSE at the root.
 /**
- * LOAD, HEAT AND WEIGHT ROLL-UPS (IFC-CORE-DELTAS power-3), by the rules of
- * DATABASE.server.BIM SRC/tools/ifc/kit_report.py:
+ * LOAD, HEAT AND WEIGHT ROLL-UPS (IFC-CORE-DELTAS power-3). The rule is the
+ * ONE shared roll-up, contracts/src/ifc/rollup.ts (vendored in apk-ifc.js;
+ * its Python twin is DATABASE.server.BIM SRC/bim/rollup.py, both held to
+ * contracts/vectors/ifc/rollup.json), on tools/ifc/kit_report.py's rules:
  *
  *   - A DECLARED total wins over summing parts. A load (or its BIM part) that
  *     declares a weight is that weight; its components are not added again.
@@ -27,7 +29,7 @@
  * Units: W, kg, VA.
  */
 
-import { getPsets, parseStep, ports, unwrap, isTypeObject } from '../vendor/apk-contracts/apk-ifc.js';
+import { getPsets, parseStep, ports, unwrap, isTypeObject, rollup as rollupNode, rollupTotal } from '../vendor/apk-contracts/apk-ifc.js';
 
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
@@ -87,52 +89,31 @@ export function partFacts(text, partId = null) {
 export const isDistribution = (facts) => !!facts && facts.entity === 'IFCELECTRICDISTRIBUTIONBOARDTYPE';
 
 /** A sum over items, each {value|null}: {value, known, unknown, partial}. Empty is 0, all-unknown is null. */
-export function total(values) {
-  let sum = 0;
-  let known = 0;
-  let unknown = 0;
-  for (const v of values) {
-    if (v == null) unknown += 1;
-    else { sum += v; known += 1; }
-  }
-  const value = known === 0 && unknown > 0 ? null : Math.round(sum * 1000) / 1000;
-  return { value, known, unknown, partial: unknown > 0 && known > 0 };
+export const total = rollupTotal;
+
+/** A load (and its kit components) as a node of the shared roll-up: its own figures, its part's as `type`. */
+export function loadNode(load, facts, { passThrough = false } = {}) {
+  const f = (load.part && facts(load.part)) || null;
+  return {
+    id: load.id,
+    watts: load.watts, heatW: load.heatW, weightKg: load.weightKg, powerFactor: load.powerFactor,
+    type: f ? { watts: f.watts, heatW: f.heatW, weightKg: f.weightKg, powerFactor: f.powerFactor } : null,
+    passThrough,
+    parts: (load.parts ?? []).map((c) => loadNode(c, facts)),
+  };
 }
 
 /**
  * One load (a device, a kit, a planned stub) as {watts, heatW, weightKg, va, …}
  * with where each came from. facts: (partId) => partFacts | null.
  */
-export function loadFigures(load, facts, { passThrough = false } = {}) {
-  const f = (load.part && facts(load.part)) || null;
-  const kids = (load.parts ?? []).map((c) => loadFigures(c, facts));
-  const pick = (own, typeVal, kidVals) => {
-    if (num(own) != null) return [own, 'declared'];
-    if (num(typeVal) != null) return [typeVal, 'part'];
-    if (kidVals.length) {
-      const t = total(kidVals);
-      return [t.value, t.unknown ? (t.known ? 'partial: known parts only' : 'unknown') : 'sum of parts'];
-    }
-    return [null, 'unknown'];
+export function loadFigures(load, facts, opts = {}) {
+  const r = rollupNode(loadNode(load, facts, opts));
+  return {
+    watts: r.watts, wattsFrom: r.wattsFrom, heatW: r.heatW, heatFrom: r.heatFrom, heatAssumed: r.heatAssumed,
+    weightKg: r.weightKg, weightFrom: r.weightFrom, powerFactor: r.powerFactor, pfAssumed: r.pfAssumed, va: r.va,
+    facts: (load.part && facts(load.part)) || null,
   };
-  let [watts, wattsFrom] = pick(load.watts, f?.watts, kids.map((k) => k.watts));
-  const [weightKg, weightFrom] = pick(load.weightKg, f?.weightKg, kids.map((k) => k.weightKg));
-  // heat: declared (here or by the part); else the components' when every one declares it; else the power, assumed
-  const kidsDeclareHeat = kids.length > 0 && kids.every((k) => k.heatW != null && !k.heatAssumed);
-  let [heatW, heatFrom] = pick(load.heatW, f?.heatW, kidsDeclareHeat ? kids.map((k) => k.heatW) : []);
-  let heatAssumed = false;
-  if (heatW == null && watts != null) { heatW = watts; heatFrom = 'assumed: all power becomes heat'; heatAssumed = true; }
-  if (heatW == null && kids.length) {
-    const t = total(kids.map((k) => k.heatW));
-    heatW = t.value;
-    heatFrom = t.unknown ? (t.known ? 'partial: known parts only' : 'unknown') : 'sum of parts';
-    heatAssumed = kids.some((k) => k.heatAssumed);
-  }
-  if (passThrough && watts == null) { watts = 0; wattsFrom = 'pass-through'; heatW = heatW ?? 0; heatFrom = heatFrom === 'unknown' ? 'pass-through' : heatFrom; }
-  const pfOwn = num(load.powerFactor) ?? f?.powerFactor ?? null;
-  const pf = pfOwn != null && pfOwn > 0 ? pfOwn : 1;
-  const va = watts == null ? null : Math.round((watts / pf) * 1000) / 1000;
-  return { watts, wattsFrom, heatW, heatFrom, heatAssumed, weightKg, weightFrom, powerFactor: pf, pfAssumed: pfOwn == null || !(pfOwn > 0), va, facts: f };
 }
 
 /** A load's circuit: its own, else the circuit of the load it is plugged into (a PDU), walking fedBy. */
