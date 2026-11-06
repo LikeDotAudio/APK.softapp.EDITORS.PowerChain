@@ -64,7 +64,7 @@ export function renderPowerDiagramSvg(model, options = {}) {
         ` : ''}
 
         <text x="480" y="${y + 16}" font-family="'JetBrains Mono', monospace" font-size="11" fill="#888888">${esc(ckt.volts)}V · ${esc(ckt.breakerAmps)}A</text>
-        <text x="580" y="${y + 16}" font-family="'JetBrains Mono', monospace" font-size="11" fill="#f4f4f5">${esc(ckt.loadsVA)} VA</text>
+        <text x="580" y="${y + 16}" font-family="'JetBrains Mono', monospace" font-size="11" fill="#f4f4f5">${esc(Math.round((model.circuitVA ? model.circuitVA(ckt) : ckt.loadsVA) * 10) / 10)} VA</text>
         <text x="660" y="${y + 16}" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="600" fill="${isOverload ? '#EF4444' : isNearLimit ? '#F59E0B' : '#10B981'}">${amps} A (${capPct}%)</text>
         
         <!-- Progress mini bar -->
