@@ -19,6 +19,11 @@
      describe()     its inputs, outputs and controls, drawn as a ? help panel.
      showProblem()  an error as what happened / why / do this, with Retry.
      fetchJson()    an input read that never throws and says what went wrong.
+     saveModel()    Save Model: the page's native .json AND its .ifc twin, both
+                    or neither (File System Access API, else two downloads).
+     openModel()    Open Model: an .ifc or the native .json (picker, file or URL).
+     storeModel()   an .ifc as one immutable version in the portal's model
+     storedModels() archive (/api/files/ifc/<project>/), and its version list.
 
    Standalone-safe: no CAD around it, save() downloads a .json file and the
    page says so on screen; no APKContracts / APKBus / broker, discovered() and
@@ -128,6 +133,33 @@
        problems: ['bad_input', 'save_failed'] });
    draws a ? button (bottom-left, F1) with the three lists and the fixes for
    the problems the app can hit. A bus input/output adds the broker ones.
+
+   ─────────────────────────────────────────────────────────────────────────
+   OPEN MODEL / SAVE MODEL — IFC4X3 is the core data model (owner 2026-11-06):
+   every save writes the page's native JSON and its .ifc twin; open takes either.
+   The page brings both codecs (toIfc / fromIfc on the contracts STEP codec,
+   contracts/src/ifc/step.ts — parseStep, writeStep, getPsets, ports,
+   connections); this file brings the one picker, writer and fallback.
+
+     const r = await APKSoftapp.saveModel(model, {
+       name: 'bench',                          // → bench.ifc + bench.json
+       toIfc: (m) => toIfc(m),                 // REQUIRED — STEP text (or a promise)
+       toJson: (m) => m.toBlock(),             // optional, the model itself by default
+     });                                       // r.ok, r.via 'directory'|'download', r.files
+     const o = await APKSoftapp.openModel({
+       fromIfc: (text, name) => fromIfc(text), // .ifc → the page's model
+       fromJson: (data, name) => data,         // .json → the page's model (default: as parsed)
+       // file: aDroppedFile | url: '/api/bim/bench.ifc'   (else a picker)
+     });                                       // o.ok, o.kind 'ifc'|'json', o.model, o.text
+     if (!o.ok && !o.cancelled) APKSoftapp.showProblem(o.problem);
+
+   Both texts are made before either is written; a toIfc that throws or returns
+   no ISO 10303-21 file writes nothing (save_failed). With showDirectoryPicker
+   both land in one folder picked once a session, the .ifc first, and a failed
+   .json write puts the old .ifc back; without it both download. A cancelled
+   picker is { ok: false, cancelled: true } and no problem. Never throws.
+     APKSoftapp.storeModel('lab', ifcText, { name: 'bench' })  // PUT /api/files/ifc/lab/bench-<UTC>.ifc
+     APKSoftapp.storedModels('lab')                            // { versions: [{ name, url, mtime, size }] }
 
    ─────────────────────────────────────────────────────────────────────────
    APKSoftapp.esc(s) escapes text for HTML: every interpolated string goes
@@ -1244,6 +1276,238 @@
         return true;
     }
 
+    /* ───────────────────────── OPEN MODEL / SAVE MODEL ─────────────────────────
+       IFC4X3 is the core data model (owner 2026-11-06): a page's model is saved as
+       its native JSON AND its .ifc twin, both or neither, and opened from either.
+       The page owns both codecs (toIfc with the contracts STEP codec); this is
+       the one picker / writer / download every softapp shares. */
+    var STEP_RE = /^\s*ISO-10303-21\s*;/;
+    var SEGMENT_RE = /^[A-Za-z0-9_-][A-Za-z0-9._-]*$/;
+    var MODEL_FILE_TYPES = [
+        { description: 'IFC model (ISO 10303-21)', accept: { 'model/step': ['.ifc'] } },
+        { description: 'Native model (JSON)', accept: { 'application/json': ['.json'] } }
+    ];
+    var modelDir = null;   // the folder the last Save Model wrote, offered again this page session
+
+    function isStep(text) { return typeof text === 'string' && STEP_RE.test(text); }
+
+    /* A file stem: no folder, no extension, only [A-Za-z0-9._-], never a leading dot. */
+    function modelStem(name) {
+        var s = String(name || '').split(/[\\/]/).pop().replace(/\.(ifc|json|bcfzip)$/i, '')
+            .replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^[._]+/, '');
+        return s || 'model';
+    }
+
+    function cancelled(e) { return !!e && (e.name === 'AbortError' || e.code === 20); }
+
+    function downloadText(text, name, type) {
+        var doc = root.document;
+        if (!doc || typeof root.Blob !== 'function' || !root.URL || !root.URL.createObjectURL) return false;
+        var url = root.URL.createObjectURL(new root.Blob([text], { type: type }));
+        var a = doc.createElement('a');
+        a.href = url;
+        a.download = name;
+        (doc.body || doc.documentElement).appendChild(a);
+        a.click();
+        if (a.remove) a.remove();
+        root.URL.revokeObjectURL(url);
+        return true;
+    }
+
+    function readHandle(dir, name) {
+        return dir.getFileHandle(name).then(function (h) { return h.getFile(); })
+            .then(function (f) { return readText(f); }).catch(function () { return null; });
+    }
+
+    function writeHandle(dir, name, text, type) {
+        return dir.getFileHandle(name, { create: true }).then(function (h) { return h.createWritable(); })
+            .then(function (w) {
+                return Promise.resolve(w.write(typeof root.Blob === 'function' ? new root.Blob([text], { type: type }) : text))
+                    .then(function () { return w.close(); });
+            });
+    }
+
+    /* Save Model: the page's native JSON and its .ifc twin.
+         APKSoftapp.saveModel(model, {
+           name: 'bench',                 // file stem → bench.json + bench.ifc
+           toIfc(model) { return ifc.writeStep(...) },   // REQUIRED: STEP text (or a promise of it)
+           toJson(model) { return model.toBlock() },      // optional; the model itself by default
+           directory,                     // optional FileSystemDirectoryHandle; else the last one, else a picker
+           pick: true,                    // optional: ask for the folder again (Save As)
+           picker: false,                 // optional: never use the File System Access API (download)
+         }) → Promise<{ ok, via: 'directory'|'download', files: [name…], problem?, cancelled? }>
+       Both texts are built BEFORE anything is written: a toIfc that throws, or
+       returns no ISO 10303-21 file, writes nothing (problem save_failed). With
+       the File System Access API both land in one folder the user picks once
+       (the .ifc first, then the .json; a failed .json puts the old .ifc back,
+       or removes the new one), else both are downloaded. Never throws. */
+    function saveModel(model, opts) {
+        opts = opts || {};
+        var stem = modelStem(opts.name || opts.filename || (root.document && root.document.title));
+        var names = { ifc: stem + '.ifc', json: stem + '.json' };
+        var fail = function (detail, e) {
+            return { ok: false, via: '', files: [], cancelled: cancelled(e),
+                problem: cancelled(e) ? null : problem('save_failed', { subject: stem, detail: detail }) };
+        };
+        if (typeof opts.toIfc !== 'function') return Promise.resolve(fail('this page gave Save Model no toIfc(model): the .ifc twin is not optional'));
+        var json;
+        try {
+            var native = typeof opts.toJson === 'function' ? opts.toJson(model) : model;
+            json = JSON.stringify(native, null, 2) + '\n';
+        } catch (e) { return Promise.resolve(fail('the native JSON could not be written: ' + (e && e.message))); }
+        return Promise.resolve().then(function () { return opts.toIfc(model); }).then(function (ifcText) {
+            if (!isStep(ifcText)) return fail('toIfc(model) did not return an ISO 10303-21 (.ifc) file');
+            var useFs = opts.picker !== false && (opts.directory || typeof root.showDirectoryPicker === 'function');
+            if (!useFs) {
+                var ok = downloadText(ifcText, names.ifc, 'model/step') && downloadText(json, names.json, 'application/json');
+                return ok ? { ok: true, via: 'download', files: [names.ifc, names.json] }
+                    : fail('this page can neither write a folder nor download a file');
+            }
+            var dirP = opts.directory ? Promise.resolve(opts.directory) : modelDir && !opts.pick ? Promise.resolve(modelDir)
+                : Promise.resolve(root.showDirectoryPicker({ id: 'apk-model', mode: 'readwrite' }));
+            return dirP.then(function (dir) {
+                return readHandle(dir, names.ifc).then(function (oldIfc) {
+                    return writeHandle(dir, names.ifc, ifcText, 'model/step').then(function () {
+                        return writeHandle(dir, names.json, json, 'application/json').catch(function (e) {
+                            var undo = oldIfc == null ? Promise.resolve(dir.removeEntry && dir.removeEntry(names.ifc))
+                                : writeHandle(dir, names.ifc, oldIfc, 'model/step');
+                            return undo.catch(function () {}).then(function () { throw e; });
+                        });
+                    });
+                }).then(function () {
+                    modelDir = dir;
+                    return { ok: true, via: 'directory', files: [names.ifc, names.json], directory: dir };
+                });
+            }).catch(function (e) {
+                if (e && e.name === 'NotAllowedError') modelDir = null;
+                return fail((e && e.message) || String(e), e);
+            });
+        }, function (e) { return fail('toIfc(model) failed: ' + ((e && e.message) || e)); });
+    }
+
+    function readText(file) {
+        if (file && typeof file.text === 'function') return Promise.resolve(file.text());
+        return new Promise(function (resolve, reject) {
+            if (typeof root.FileReader !== 'function') { reject(new Error('no FileReader in this page')); return; }
+            var r = new root.FileReader();
+            r.onload = function () { resolve(String(r.result)); };
+            r.onerror = function () { reject(r.error || new Error('the file could not be read')); };
+            r.readAsText(file);
+        });
+    }
+
+    function pickFile() {
+        if (typeof root.showOpenFilePicker === 'function') {
+            return Promise.resolve(root.showOpenFilePicker({ id: 'apk-model', multiple: false, types: MODEL_FILE_TYPES }))
+                .then(function (hs) { return hs[0].getFile(); });
+        }
+        var doc = root.document;
+        if (!doc || !doc.createElement) return Promise.reject(new Error('this page cannot show a file picker'));
+        return new Promise(function (resolve, reject) {
+            var input = doc.createElement('input');
+            input.type = 'file';
+            input.accept = '.ifc,.json,model/step,application/x-step,application/json';
+            input.onchange = function () { var f = input.files && input.files[0]; if (f) resolve(f); else reject(abortError()); };
+            if (input.addEventListener) input.addEventListener('cancel', function () { reject(abortError()); });
+            input.click();
+        });
+    }
+
+    function abortError() { var e = new Error('nothing was picked'); e.name = 'AbortError'; return e; }
+
+    /* Open Model: an .ifc or the page's native .json.
+         APKSoftapp.openModel({
+           fromIfc(text, name) { return model },   // the page's IFC reader (contracts STEP codec)
+           fromJson(data, name) { return model },  // optional; the parsed JSON itself by default
+           file,  // optional File/Blob (a drop); url, // optional: fetch it (e.g. /api/bim/bench.ifc)
+         }) → Promise<{ ok, kind: 'ifc'|'json', name, text, model, problem?, cancelled? }>
+       The kind is the extension, else the content (an ISO 10303-21 header is
+       IFC). Without fromIfc an .ifc comes back as text with model null. Never throws. */
+    function openModel(opts) {
+        opts = opts || {};
+        var name = '';
+        var bad = function (code, detail, e) {
+            return { ok: false, kind: '', name: name, cancelled: cancelled(e),
+                problem: cancelled(e) ? null : problem(code, { subject: name || 'model', detail: detail }) };
+        };
+        var src;
+        if (opts.file) src = Promise.resolve(opts.file);
+        else if (opts.url) {
+            name = String(opts.url).split('?')[0].split('/').pop();
+            if (typeof root.fetch !== 'function') return Promise.resolve(bad('unsupported_browser', 'no fetch() in this page'));
+            src = root.fetch(opts.url, { headers: { Accept: 'model/step, application/json;q=0.9, */*;q=0.1' } }).then(function (r) {
+                if (!r.ok) { var e = new Error('HTTP ' + r.status + ' for ' + opts.url); e.status = r.status; throw e; }
+                return r.text().then(function (text) { return { name: name, text: function () { return text; } }; });
+            });
+        } else src = pickFile();
+        return src.then(function (file) {
+            name = name || String(file.name || '');
+            return readText(file).then(function (text) {
+                var ext = (/\.([A-Za-z0-9]+)$/.exec(name) || [])[1];
+                ext = ext ? ext.toLowerCase() : '';
+                var kind = ext === 'ifc' || (ext !== 'json' && isStep(text)) ? 'ifc' : 'json';
+                if (kind === 'ifc') {
+                    if (!isStep(text)) return bad('bad_input', 'an .ifc file starts with ISO-10303-21; — this one does not');
+                    return Promise.resolve().then(function () { return typeof opts.fromIfc === 'function' ? opts.fromIfc(text, name) : null; })
+                        .then(function (model) { return { ok: true, kind: kind, name: name, text: text, model: model }; },
+                            function (e) { return bad('bad_input', 'the IFC was read but is not this app\'s model: ' + ((e && e.message) || e)); });
+                }
+                var data;
+                try { data = JSON.parse(text); } catch (e) { return bad('bad_json', e.message); }
+                return Promise.resolve().then(function () { return typeof opts.fromJson === 'function' ? opts.fromJson(data, name) : data; })
+                    .then(function (model) { return { ok: true, kind: kind, name: name, text: text, model: model }; },
+                        function (e) { return bad('bad_input', (e && e.message) || String(e)); });
+            });
+        }).catch(function (e) {
+            if (e && e.status) return { ok: false, kind: '', name: name, status: e.status, problem: explain({ ok: false, status: e.status, url: String(opts.url) }, { subject: name }) };
+            return bad('file_unreadable', (e && e.message) || String(e), e);
+        });
+    }
+
+    function utcStamp(d) {
+        return d.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+    }
+
+    /* The model archive (Storage-Portal /api/files/ifc/<project>/<version>.ifc —
+       immutable versions, never swept, DATABASE.server.SQL):
+         APKSoftapp.storeModel(project, ifcText, { name: 'bench', version?, base? })
+           → Promise<{ ok, url, version, status, problem? }>   PUT model/step; 409 = that version exists
+         APKSoftapp.storedModels(project, { base? }) → Promise<{ ok, versions: [{ name, url, mtime, size }] }>
+           newest first; a project nobody has stored is ok with [].
+       A write from the host's :8080 or the LAN needs the gateway credential (the
+       browser asks); in-network it does not. */
+    function storeModel(project, ifcText, opts) {
+        opts = opts || {};
+        var base = String(opts.base || '/api/files/ifc/');
+        project = modelStem(project);
+        var version = opts.version ? modelStem(opts.version) : modelStem(opts.name) + '-' + utcStamp(new Date());
+        var url = base + encodeURIComponent(project) + '/' + encodeURIComponent(version) + '.ifc';
+        var no = function (code, detail, status) { return { ok: false, url: url, version: version, status: status || 0, problem: problem(code, { subject: project, detail: detail }) }; };
+        if (!isStep(ifcText)) return Promise.resolve(no('bad_input', 'not an ISO 10303-21 (.ifc) file'));
+        if (!SEGMENT_RE.test(project) || !SEGMENT_RE.test(version)) return Promise.resolve(no('bad_input', 'a project and a version are [A-Za-z0-9._-]'));
+        if (typeof root.fetch !== 'function') return Promise.resolve(no('unsupported_browser', 'no fetch() in this page'));
+        return root.fetch(url, { method: 'PUT', headers: { 'Content-Type': 'model/step' }, body: ifcText }).then(function (r) {
+            if (r.status === 201 || r.status === 204) return { ok: true, url: url, version: version, status: r.status };
+            if (r.status === 409) return no('save_failed', 'version ' + version + ' is already stored, and a stored version never changes', 409);
+            if (r.status === 401 || r.status === 403) return no('permission_denied', 'the file store wants the bench credential for a write from here', r.status);
+            return { ok: false, url: url, version: version, status: r.status, problem: explain({ ok: false, status: r.status, url: url }, { subject: project }) };
+        }, function (e) { return no('save_failed', (e && e.message) || String(e)); });
+    }
+
+    function storedModels(project, opts) {
+        opts = opts || {};
+        var base = String(opts.base || '/api/files/ifc/');
+        var dir = base + encodeURIComponent(modelStem(project)) + '/';
+        return fetchJson(dir).then(function (r) {
+            if (!r.ok && r.status === 404) return { ok: true, versions: [] };
+            if (!r.ok) return { ok: false, versions: [], problem: r.problem };
+            var list = (Array.isArray(r.data) ? r.data : []).filter(function (x) { return isObj(x) && x.type === 'file' && /\.ifc$/i.test(x.name || ''); })
+                .map(function (x) { return { name: x.name, url: dir + encodeURIComponent(x.name), mtime: x.mtime || '', size: x.size || 0 }; });
+            list.sort(function (a, b) { return String(b.mtime).localeCompare(String(a.mtime)) || b.name.localeCompare(a.name); });
+            return { ok: true, versions: list };
+        });
+    }
+
     var api = {
         PROTOCOL: PROTOCOL,
         TRUST_MINUTES: TRUST_MINUTES,
@@ -1271,6 +1535,12 @@
         interfacesTable: tableRows,
         inheritTheme: inheritTheme,
         macIn: macIn,
+        saveModel: saveModel,
+        openModel: openModel,
+        storeModel: storeModel,
+        storedModels: storedModels,
+        isStep: isStep,
+        modelStem: modelStem,
         esc: esc
     };
     root.APKSoftapp = api;
