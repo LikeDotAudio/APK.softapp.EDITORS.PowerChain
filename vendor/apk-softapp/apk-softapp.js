@@ -123,6 +123,11 @@
    ok:false handle above carries .problem too. An error or rejected promise
    nobody caught becomes a card on its own (guard(), on unless
    window.APK_SOFTAPP_GUARD = false is set before this file loads).
+   Every card is also REPORTED (contracts report.ts): a retained ProblemRecord
+   on System/Problems/{app}/{key} + a LogLine on System/Log/{app}/{level},
+   read by UTILITY.Problems and UTILITY.Log; Retry clears it. APKSoftapp.log
+   (level, message, opts) says one line; reportProblem / clearReportedProblem
+   raise and clear without a card; codeForStatus(status) is the catalogue's.
 
    INPUTS, OUTPUTS, CONTROL — what the app IS
 
@@ -957,7 +962,7 @@
                 .then(function (r) { if (!r.ok) throw Object.assign(new Error(r.status + ' from ' + opts.url), { status: r.status }); return r.json(); })
                 .then(function (doc) { return take(doc) ? handle({}) : idle(opts.url + ' holds no Interfaces table.', 'bad_input'); })
                 .catch(function (e) {
-                    var code = e.status ? (e.status === 404 ? 'http_not_found' : e.status >= 500 ? 'http_server_error' : 'http_forbidden') : explain(e).code;
+                    var code = e.status ? statusCode(e.status) : explain(e).code;
                     return idle('Could not read ' + opts.url + ' (' + e.message + ').', code);
                 });
         }
@@ -1080,11 +1085,12 @@
         opts = opts || {};
         if (typeof p === 'string') p = problem(p, opts);
         else p = explain(p, opts);
+        var tone = p.area === 'browser' || p.retry ? 'kinda' : 'dead';
+        if (opts.report !== false) reportProblem(p, opts, opts.level || (tone === 'dead' ? 'error' : 'warn'));
         var doc = root.document;
         if (!doc || !doc.createElement) return null;
         var key = p.code + '|' + (p.detail || '') + '|' + (p.subject || '');
         if (!opts.into && shown[key] && shown[key].parentNode) return shown[key];
-        var tone = p.area === 'browser' || p.retry ? 'kinda' : 'dead';
         var card = el(doc, 'section', 'font:13px/1.4 system-ui,sans-serif;color:var(--text-main,#eee);'
             + 'background:var(--bg-panel,#1e1e1e);border:1px solid var(--border-color,#444);'
             + 'border-left:4px solid var(--apk-state-' + tone + ',' + (tone === 'dead' ? '#e5484d' : '#e5a50a') + ');'
@@ -1119,7 +1125,7 @@
             else if (card.parentNode && card.parentNode.removeChild) card.parentNode.removeChild(card);
             if (opts.onClose) opts.onClose(p);
         }
-        if (opts.onRetry && p.retry !== false) button('Retry', function () { close(); opts.onRetry(p); }, true);
+        if (opts.onRetry && p.retry !== false) button('Retry', function () { close(); clearReportedProblem(p, opts); opts.onRetry(p); }, true);
         button('Copy details', function () {
             var text = problemText(p);
             try { root.navigator.clipboard.writeText(text); } catch (e) { /* no clipboard: the text is on screen */ }
@@ -1140,6 +1146,95 @@
         return card;
     }
 
+    /* ─────────── REPORTED, NOT ONLY PAINTED (contracts/src/report.ts) ───────────
+       Every problem a card shows is also raised on the bus, the way the OS
+       shell's OS.showAppProblem does: a retained ProblemRecord on
+       APK.audio/System/Problems/{source}/{key} (UTILITY.Problems lists it) and
+       an error/warn LogLine on APK.audio/System/Log/{source}/{level}
+       (UTILITY.Log tails it). source = the app's described name, else its
+       document title. Retry clears the record first; Dismiss does not (the
+       fault may still be there — the record goes stale after its ttl).
+       No contracts bundle, no APKBus or no broker: the card stands, nothing
+       is sent, nothing throws. showProblem(p, { report: false }) opts out.
+
+         APKSoftapp.log('info', 'Loaded 12 racks', { app: 'loader' })   // one LogLine
+         APKSoftapp.reportProblem(p, { subject })                        // raise without painting
+         APKSoftapp.clearReportedProblem(p, { subject })                 // the way back taken */
+    var REPORT_TTL_S = 300;
+    var reported = {};   // topic -> the record last raised there (count + raised_at carry over)
+
+    function reportName(opts) {
+        var C = root.APKContracts;
+        var name = (opts && opts.source) || (described && described.name) || (root.document && root.document.title) || 'softapp';
+        return C && typeof C.reportSource === 'function' ? C.reportSource(name) : String(name);
+    }
+
+    /* Publish the messages once the page's bus is up; never throws, never waits the caller. */
+    function sendReport(msgs) {
+        if (!root.APKBus || typeof root.APKBus.connect !== 'function') return;
+        bus().then(function (link) {
+            if (!link || typeof link.publish !== 'function') return;
+            msgs.forEach(function (m) {
+                try { link.publish(m.topic, m.payload, { retain: m.retain, qos: 0 }); } catch (e) { /* the card stands */ }
+            });
+        }, function () {});
+    }
+
+    /* The HTTP status → catalogue code, from the catalogue's own table. */
+    function statusCode(status) {
+        var C = root.APKContracts;
+        return C && typeof C.codeForStatus === 'function' ? C.codeForStatus(status) : 'script_error';
+    }
+
+    function log(level, message, opts) {
+        var C = root.APKContracts;
+        opts = opts || {};
+        if (!C || typeof C.logLine !== 'function') return null;
+        var o = {};
+        ['code', 'subject', 'detail', 'app'].forEach(function (k) { if (opts[k] != null && opts[k] !== '') o[k] = String(opts[k]); });
+        var said;
+        try { said = C.logLine(reportName(opts), level, message, o); } catch (e) { return null; }
+        sendReport([said]);
+        return said;
+    }
+
+    function reportProblem(p, opts, level) {
+        var C = root.APKContracts;
+        opts = opts || {};
+        if (typeof p === 'string') p = problem(p, opts);
+        if (!C || typeof C.problemRecord !== 'function' || !p || !p.code) return null;
+        var source = reportName(opts);
+        var subject = p.subject != null && p.subject !== '' ? String(p.subject) : undefined;
+        var raised, said;
+        try {
+            var topic = C.problemTopic(source, C.problemKey(p.code, subject));
+            var pass = { ttl_s: REPORT_TTL_S, previous: reported[topic] || null };
+            if (subject) pass.subject = subject;
+            if (p.detail) pass.detail = String(p.detail);
+            if (Array.isArray(opts.fix) && opts.fix.length) pass.fix = opts.fix.map(String);
+            if (opts.app) pass.app = String(opts.app);
+            raised = C.problemRecord(source, p.code, pass);
+            said = C.logLine(source, level || 'warn', (opts.app ? opts.app + ': ' : '') + p.title,
+                { code: p.code, subject: subject, detail: p.detail ? String(p.detail) : undefined, app: opts.app ? String(opts.app) : undefined });
+        } catch (e) { return null; }
+        reported[raised.topic] = raised.record;
+        sendReport([raised, said]);
+        return [raised, said];
+    }
+
+    function clearReportedProblem(p, opts) {
+        var C = root.APKContracts;
+        opts = opts || {};
+        if (typeof p === 'string') p = problem(p, opts);
+        if (!C || typeof C.clearProblem !== 'function' || !p || !p.code) return null;
+        var subject = p.subject != null && p.subject !== '' ? String(p.subject) : undefined;
+        var gone;
+        try { gone = C.clearProblem(reportName(opts), p.code, subject); } catch (e) { return null; }
+        delete reported[gone.topic];
+        sendReport([gone]);
+        return gone;
+    }
+
     /* The page's last line of defence: an error or a rejected promise nobody
        caught becomes a card with a way back, instead of a dead button and a
        console nobody has open. On by default for every page that loads this
@@ -1154,17 +1249,17 @@
             if (!e || e.target && e.target !== root && e.target.tagName) {
                 // a <script>/<img>/<link> that failed to load: name the file
                 var src = e && e.target && (e.target.src || e.target.href);
-                if (src && /apk-(contracts|softapp)/.test(src)) showProblem('sdk_missing', { detail: src + ' did not load' });
+                if (src && /apk-(contracts|softapp)/.test(src)) showProblem('sdk_missing', { detail: src + ' did not load', level: 'error' });
                 return;
             }
             var msg = String((e.error && e.error.message) || e.message || '');
             if (NOISE.test(msg)) return;
-            showProblem(e.error || msg, { subject: opts.subject || described && described.name });
+            showProblem(e.error || msg, { subject: opts.subject || described && described.name, level: 'error' });
         }, true);
         root.addEventListener('unhandledrejection', function (e) {
             var r = e && e.reason;
             if (NOISE.test(String(r && r.message || r))) return;
-            showProblem(r, { subject: opts.subject || described && described.name });
+            showProblem(r, { subject: opts.subject || described && described.name, level: 'error' });
         });
         return true;
     }
@@ -1555,6 +1650,10 @@
         explain: explain,
         problemText: problemText,
         showProblem: showProblem,
+        reportProblem: reportProblem,
+        clearReportedProblem: clearReportedProblem,
+        log: log,
+        codeForStatus: statusCode,
         guard: guard,
         fetchJson: fetchJson,
         describe: describe,
