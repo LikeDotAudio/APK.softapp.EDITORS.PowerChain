@@ -12,3 +12,7 @@ The documentation for `EDITORS.PowerChain`, in the same lanes as the APK.audio m
 | [🛣Roadmap](%F0%9F%9B%A3Roadmap/INDEX.md) | 0 | Nothing to do is kept here: every roadmap item lives in the APK.audio monorepo's `Documentation/🛣Roadmap/roadmap.htm`. |
 | [💡Notes and Ideas](%F0%9F%92%A1Notes%20and%20Ideas/INDEX.md) | 0 | Loose notes and ideas not yet filed. |
 <!-- /wiki:lanes -->
+
+<!-- wiki:smoke -->
+**Smoke test** — ✅ PASS 2/2 since 2026-11-12 00:27 EST — [results](%F0%9F%A7%A9Manual%20and%20Artifacts/SMOKE.md)
+<!-- /wiki:smoke -->
